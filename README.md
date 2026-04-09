@@ -93,6 +93,8 @@ uv run python main.py --full-run -v
 | `--seed N` | random | random | Random seed for scoring reproducibility (Monte Carlo sampling). |
 | `--max-concurrent-api N` | `20` | `20` | Max concurrent API calls per provider. Controls parallelism. |
 | `--summarize-rounds` | off | off | At each round boundary, ask the generator to summarize its work so far, then replace the conversation history with that summary. Reduces token cost on long runs at the expense of one extra API call per round. |
+| `--prompt-level LEVEL` | `standard` | `standard` | How much strategic guidance the generator receives: `minimal` (scoring formula only), `standard` (+ scoring details), `detailed` (+ full strategy with prescriptive advice). |
+| `--resume STATE_FILE` | — | — | Resume a crashed or interrupted run from a state file. See [Resuming a Run](#resuming-a-run). |
 | `--verbose`, `-v` | off | off | Enable debug logging from `src.*` modules. |
 
 ### Known Model Keys
@@ -119,6 +121,30 @@ uv run python main.py --full-run -v
 You can also pass full model IDs directly (e.g. `--solver-models claude-sonnet-4-6`).
 
 > **Note:** OpenAI models are supported in code but currently commented out in the model registry (`src/config.py`). To enable them, uncomment the entries and set `OPENAI_API_KEY` in `.env`.
+
+## Resuming a Run
+
+Every eval run writes a state file to `results/progress/` that is updated after each round. If a run crashes or is interrupted (Ctrl-C, network failure, etc.), you can pick up where it left off:
+
+```bash
+# Resume from a state file (full path)
+uv run python main.py --resume results/progress/eval_20260409_230918_state.json
+
+# Or just the filename — it checks results/progress/ automatically
+uv run python main.py --resume eval_20260409_230918_state.json
+```
+
+The resume flag restores the full config, model list, anonymization maps, conversation history, and completed round results from the checkpoint. Generators that already finished are skipped; in-progress generators continue from their last completed round.
+
+State files are JSON and can be inspected directly. The companion `_events.jsonl` file in the same directory contains a timestamped event log for monitoring.
+
+**What is preserved on resume:**
+- All config parameters (rounds, attempt counts, models, seed, etc.)
+- Per-generator progress (completed rounds, solver results, conversation history)
+- Anonymization mappings (opponent identities stay consistent)
+- Cost tracking restarts from zero (API calls from the prior run are not double-counted since the checkpoint stores results, not costs)
+
+**Note:** CLI flags other than `--resume` and `--verbose` are ignored when resuming — the config is fully reconstructed from the checkpoint to ensure consistency.
 
 ## Architecture
 

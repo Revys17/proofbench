@@ -238,6 +238,7 @@ For full results, see the run results JSON files under `results/`.
 * The generator model budget was somewhat underspecified in the problem statement. I interpreted this as **the generator gets a fixed number of submissions per round and a fixed number of rounds per eval.** If instead there should be a token limit, we would have to implement this.
 * The eval results depend heavily on which models you choose to use as solvers, and the main `gap_score` result doesn't mean much when any of the solvers are generally stronger than the generator. The per-opponent results are more meaningful. Gap scores are also not directly comparable across generators if they face a different effective opponent pool.
 * I didn't have time to run a `--full-run` run - doing so would take on the order of 6 hours or so by my estimate. I ran several test runs with low budgets to iron things out and a few runs with larger budgets, but only using Opus & Sonnet 4.6 as generators/solvers, and sometimes Haiku 4.5 as a solver.
+* Runs are still pretty slow, as mentioned.
 
 ## Extensions
 
@@ -245,3 +246,4 @@ For full results, see the run results JSON files under `results/`.
 * Larger runs take a while - a run dashboard would help with monitoring run status
 * An Elo-style ranking across models would complement the gap score — the gap score measures a generator's ability to find problems that specifically differentiate it from opponents, while Elo would measure overall relative math proving strength.
 * Use prompting to intentionally diversify the math domains that the generators operate in to check whether math capabilities are jagged across domains.
+* Do profiling to determine where time in the eval is being spent and optimize if necessary. My gut tells me that it's mostly spent in inference but this needs verification.

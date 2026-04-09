@@ -1,0 +1,359 @@
+{
+  "timestamp": "2026-04-09T23:09:18.860016+00:00",
+  "config": {
+    "generators": [
+      "claude-opus-4-6",
+      "claude-sonnet-4-6"
+    ],
+    "solvers": [
+      "claude-opus-4-6",
+      "claude-sonnet-4-6",
+      "claude-haiku-4-5-20251001"
+    ],
+    "rounds": 3,
+    "solver_max_calls": 10,
+    "attempts_during_loop": 3,
+    "attempts_reeval": 10,
+    "prompt_level": "standard"
+  },
+  "generators": [
+    {
+      "generator": "claude-opus-4-6",
+      "generator_display_name": "opus-4.6",
+      "anonymization": {
+        "model_self": "claude-opus-4-6",
+        "model_a": "claude-sonnet-4-6",
+        "model_b": "claude-haiku-4-5-20251001"
+      },
+      "rounds": [
+        {
+          "round": 1,
+          "theorem_statement": "theorem round1_challenge (n : \u2115) (h : n % 6 = 0) : (n^2 + 12*n) % 36 = 0",
+          "proof": ":= by\n  obtain \u27e8k, hk\u27e9 := Nat.dvd_of_mod_eq_zero h\n  subst hk\n  ring_nf\n  omega",
+          "imports": "import Mathlib.Tactic",
+          "solver_results": [
+            {
+              "model": "model_self",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_b",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            }
+          ]
+        },
+        {
+          "round": 2,
+          "theorem_statement": "theorem round2_challenge (p : \u2115) (hp : Nat.Prime p) (hp2 : p % 4 = 1) : \u2203 a b : \u2124, (p : \u2124) = a^2 + b^2",
+          "proof": ":= by\n  haveI : Fact (Nat.Prime p) := \u27e8hp\u27e9\n  have h : p % 4 \u2260 3 := by omega\n  obtain \u27e8a, b, hab\u27e9 := Nat.Prime.sq_add_sq h\n  exact \u27e8a, b, by linarith\u27e9",
+          "imports": "import Mathlib.NumberTheory.SumTwoSquares",
+          "solver_results": [
+            {
+              "model": "model_self",
+              "solved": true,
+              "successes": 2,
+              "attempts": 3
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_b",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            }
+          ]
+        },
+        {
+          "round": 3,
+          "theorem_statement": "theorem round3_challenge :\n  \u2200 n : \u2115, (Finset.range n).sum (fun i => (2 * i + 1)) = n^2",
+          "proof": ":= by\n  intro n\n  induction n with\n  | zero => simp\n  | succ k ih =>\n    rw [Finset.sum_range_succ, ih]\n    ring",
+          "imports": "import Mathlib.Tactic",
+          "solver_results": [
+            {
+              "model": "model_self",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_b",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            }
+          ]
+        }
+      ],
+      "loop_scores": [
+        {
+          "theorem_id": "round_1",
+          "gap_score": 0.3372,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.8,
+          "other_solve_rates": {
+            "model_a": 0.8,
+            "model_b": 0.8
+          }
+        },
+        {
+          "theorem_id": "round_2",
+          "gap_score": 0.0916,
+          "raw_gap": -0.20000000000000007,
+          "self_solve_rate": 0.6,
+          "other_solve_rates": {
+            "model_a": 0.8,
+            "model_b": 0.8
+          }
+        },
+        {
+          "theorem_id": "round_3",
+          "gap_score": 0.333,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.8,
+          "other_solve_rates": {
+            "model_a": 0.8,
+            "model_b": 0.8
+          }
+        }
+      ],
+      "best_submission": "round_1",
+      "final_score": {
+        "theorem_id": "round_1",
+        "gap_score": 0.3321,
+        "raw_gap": 0.0,
+        "self_solve_rate": 0.9166666666666666,
+        "other_solve_rates": {
+          "model_a": 0.9166666666666666,
+          "model_b": 0.9166666666666666
+        }
+      },
+      "cost": {
+        "per_model": {
+          "claude-haiku-4-5-20251001": {
+            "input_tokens": 458520,
+            "output_tokens": 35656,
+            "api_calls": 195,
+            "cost_usd": 0.5094
+          },
+          "claude-opus-4-6": {
+            "input_tokens": 377376,
+            "output_tokens": 27268,
+            "api_calls": 142,
+            "cost_usd": 7.7057
+          },
+          "claude-sonnet-4-6": {
+            "input_tokens": 226324,
+            "output_tokens": 21787,
+            "api_calls": 122,
+            "cost_usd": 1.0058
+          }
+        },
+        "total_cost_usd": 9.221
+      }
+    },
+    {
+      "generator": "claude-sonnet-4-6",
+      "generator_display_name": "sonnet-4.6",
+      "anonymization": {
+        "model_self": "claude-sonnet-4-6",
+        "model_a": "claude-opus-4-6",
+        "model_b": "claude-haiku-4-5-20251001"
+      },
+      "rounds": [
+        {
+          "round": 1,
+          "theorem_statement": "theorem nat_sqrt_sq_le (n : \u2115) : Nat.sqrt n ^ 2 \u2264 n",
+          "proof": ":= Nat.sqrt_le' n",
+          "imports": "import Mathlib.Data.Nat.Sqrt",
+          "solver_results": [
+            {
+              "model": "model_a",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_self",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_b",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            }
+          ]
+        },
+        {
+          "round": 2,
+          "theorem_statement": "theorem sum_range_id_mul_two (n : \u2115) : (\u2211 i \u2208 Finset.range n, i) * 2 = n * (n - 1)",
+          "proof": ":= by\n  induction n with\n  | zero => simp\n  | succ n ih =>\n    rw [Finset.sum_range_succ, Nat.add_mul, ih]\n    cases n with\n    | zero => simp\n    | succ n => simp [Nat.succ_sub_one]; ring",
+          "imports": "import Mathlib",
+          "solver_results": [
+            {
+              "model": "model_a",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_self",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_b",
+              "solved": false,
+              "successes": 0,
+              "attempts": 3
+            }
+          ]
+        },
+        {
+          "round": 3,
+          "theorem_statement": "theorem finset_sum_const_nat (n k : \u2115) : \u2211 _i \u2208 Finset.range n, k = n * k",
+          "proof": ":= by simp [Finset.sum_const, smul_eq_mul]",
+          "imports": "import Mathlib",
+          "solver_results": [
+            {
+              "model": "model_a",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_self",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_b",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            }
+          ]
+        }
+      ],
+      "loop_scores": [
+        {
+          "theorem_id": "round_1",
+          "gap_score": 0.3272,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.8,
+          "other_solve_rates": {
+            "model_a": 0.8,
+            "model_b": 0.8
+          }
+        },
+        {
+          "theorem_id": "round_2",
+          "gap_score": 0.5018,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.8,
+          "other_solve_rates": {
+            "model_a": 0.8,
+            "model_b": 0.2
+          }
+        },
+        {
+          "theorem_id": "round_3",
+          "gap_score": 0.3348,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.8,
+          "other_solve_rates": {
+            "model_a": 0.8,
+            "model_b": 0.8
+          }
+        }
+      ],
+      "best_submission": "round_2",
+      "final_score": {
+        "theorem_id": "round_2",
+        "gap_score": 0.4971,
+        "raw_gap": 0.0,
+        "self_solve_rate": 0.9166666666666666,
+        "other_solve_rates": {
+          "model_a": 0.9166666666666666,
+          "model_b": 0.16666666666666666
+        }
+      },
+      "cost": {
+        "per_model": {
+          "claude-haiku-4-5-20251001": {
+            "input_tokens": 452604,
+            "output_tokens": 35009,
+            "api_calls": 192,
+            "cost_usd": 0.5021
+          },
+          "claude-opus-4-6": {
+            "input_tokens": 377376,
+            "output_tokens": 27268,
+            "api_calls": 142,
+            "cost_usd": 7.7057
+          },
+          "claude-sonnet-4-6": {
+            "input_tokens": 226324,
+            "output_tokens": 21787,
+            "api_calls": 122,
+            "cost_usd": 1.0058
+          }
+        },
+        "total_cost_usd": 9.2136
+      }
+    }
+  ],
+  "best_generator": {
+    "model": "claude-sonnet-4-6",
+    "gap_score": 0.4971,
+    "theorem_id": "round_2"
+  },
+  "cost": {
+    "per_model": {
+      "claude-haiku-4-5-20251001": {
+        "input_tokens": 458520,
+        "output_tokens": 35656,
+        "api_calls": 195,
+        "cost_usd": 0.5094
+      },
+      "claude-opus-4-6": {
+        "input_tokens": 377376,
+        "output_tokens": 27268,
+        "api_calls": 142,
+        "cost_usd": 7.7057
+      },
+      "claude-sonnet-4-6": {
+        "input_tokens": 226324,
+        "output_tokens": 21787,
+        "api_calls": 122,
+        "cost_usd": 1.0058
+      }
+    },
+    "total_cost_usd": 9.221
+  }
+}

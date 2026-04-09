@@ -1,4 +1,12 @@
 from dataclasses import dataclass
+from enum import Enum
+
+
+class PromptLevel(Enum):
+    """Controls how much strategic guidance the generator receives."""
+    MINIMAL = "minimal"    # Scoring formula + tool/format only
+    STANDARD = "standard"  # + scoring details (reliability matters)
+    DETAILED = "detailed"  # + full strategy section with prescriptive advice
 
 
 @dataclass(frozen=True)
@@ -16,7 +24,7 @@ class EvalConfig:
     rounds: int = 3
     solver_max_calls: int = 10
     generator_max_calls: int = 20
-    attempts_during_loop: int = 1
+    attempts_during_loop: int = 3
     attempts_reeval: int = 3
     lean_timeout_seconds: int = 120
     lean_project_path: str = "lean_solver"
@@ -26,6 +34,7 @@ class EvalConfig:
     seed: int | None = None
     max_concurrent_api: int = 20
     summarize_rounds: bool = False
+    prompt_level: PromptLevel = PromptLevel.STANDARD
 
 
 KNOWN_MODELS: dict[str, ModelConfig] = {

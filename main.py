@@ -11,8 +11,12 @@ from src.config import (
     KNOWN_MODELS,
     EvalConfig,
     ModelConfig,
+    PromptLevel,
 )
 from src.orchestrator import run_multi_eval
+from src.progress import ProgressTracker
+
+log = logging.getLogger(__name__)
 
 
 def _available_model_keys() -> list[str]:
@@ -23,6 +27,10 @@ def _available_model_keys() -> list[str]:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="ProofBench: AI eval where a generator crafts Lean 4 theorems",
+    )
+    parser.add_argument(
+        "--resume", type=str, default=None, metavar="STATE_FILE",
+        help="Resume a crashed run from a state file (e.g. results/eval_*_state.json)",
     )
     parser.add_argument(
         "--full-run", action="store_true",
@@ -83,6 +91,13 @@ def parse_args() -> argparse.Namespace:
         help="Compact conversation history between rounds by asking the generator to summarize",
     )
     parser.add_argument(
+        "--prompt-level", type=str, default=None,
+        choices=["minimal", "standard", "detailed"],
+        help="How much strategic guidance the generator receives "
+             "(minimal: scoring formula only, standard: + scoring details, "
+             "detailed: + full strategy with prescriptive advice). Default: standard",
+    )
+    parser.add_argument(
         "--verbose", "-v", action="store_true",
         help="Enable verbose logging",
     )
@@ -115,6 +130,9 @@ def parse_args() -> argparse.Namespace:
     for key, value in defaults.items():
         if getattr(args, key) is None:
             setattr(args, key, value)
+
+    if args.prompt_level is None:
+        args.prompt_level = "standard"
 
     return args
 
@@ -168,6 +186,7 @@ def build_config(args: argparse.Namespace) -> tuple[list[ModelConfig], EvalConfi
         seed=args.seed,
         max_concurrent_api=args.max_concurrent_api,
         summarize_rounds=args.summarize_rounds,
+        prompt_level=PromptLevel(args.prompt_level),
     )
 
     return generators, base_config
@@ -200,6 +219,7 @@ def print_summary(result: dict) -> None:
     for gr in generators:
         name = gr.get("generator_display_name", gr.get("generator", "unknown"))
         fs = gr.get("final_score")
+        anon_to_real = gr.get("anonymization", {})
         if gr.get("error"):
             print(f"\n  {name}: FAILED — {gr['error']}")
         elif fs:
@@ -208,8 +228,13 @@ def print_summary(result: dict) -> None:
             print(f"    Gap score:     {fs['gap_score']:.3f}")
             print(f"    Raw gap:       {fs['raw_gap']:.3f}")
             print(f"    Self rate:     {fs['self_solve_rate']:.3f}")
-            for oname, rate in fs["other_solve_rates"].items():
-                print(f"    {oname:14s} {rate:.3f}")
+            for anon_name, rate in fs["other_solve_rates"].items():
+                info = anon_to_real.get(anon_name, {})
+                if isinstance(info, dict):
+                    display = info.get("display_name", anon_name)
+                else:
+                    display = info  # Legacy format: plain model_id string
+                print(f"    {display:20s} {rate:.3f}")
         else:
             print(f"\n  {name}: no valid theorems produced")
 
@@ -235,14 +260,72 @@ def main() -> None:
     args = parse_args()
     configure_logging(args.verbose)
 
-    generators, base_config = build_config(args)
-
-    result = asyncio.run(run_multi_eval(generators, base_config))
+    if args.resume:
+        result = _resume_run(args)
+    else:
+        generators, base_config = build_config(args)
+        result = asyncio.run(run_multi_eval(generators, base_config))
 
     print_summary(result)
 
     if not result.get("best_generator"):
         sys.exit(1)
+
+
+def _deserialize_model(data: dict | str) -> ModelConfig:
+    """Reconstruct a ModelConfig from checkpoint data."""
+    if isinstance(data, str):
+        # Legacy format: bare model_id string
+        return resolve_model(data)
+    return ModelConfig(
+        model_id=data["model_id"],
+        display_name=data.get("display_name", data["model_id"]),
+        provider=data.get("provider", "anthropic"),
+        max_tokens=data.get("max_tokens", 16384),
+    )
+
+
+def _resume_run(args: argparse.Namespace) -> dict:
+    """Resume a run from a checkpoint state file."""
+    tracker = ProgressTracker.from_checkpoint(args.resume)
+    stored = tracker.get_stored_config()
+
+    # Reconstruct models from checkpoint (preserves display_name, provider, max_tokens)
+    generator_ids = tracker.get_all_generator_ids()
+    solver_data = stored.get("solver_models", [])
+    solvers = tuple(_deserialize_model(sd) for sd in solver_data)
+
+    # Match generators to their full ModelConfig from the solver list
+    solver_by_id = {s.model_id: s for s in solvers}
+    generators = [solver_by_id.get(gid, resolve_model(gid)) for gid in generator_ids]
+
+    base_config = EvalConfig(
+        generator_model=generators[0],
+        solver_models=solvers,
+        rounds=stored.get("rounds", 3),
+        solver_max_calls=stored.get("solver_max_calls", 10),
+        generator_max_calls=stored.get("generator_max_calls", 20),
+        attempts_during_loop=stored.get("attempts_during_loop", 3),
+        attempts_reeval=stored.get("attempts_reeval", 10),
+        lean_timeout_seconds=stored.get("lean_timeout_seconds", 120),
+        lean_project_path=stored.get("lean_project_path", "lean_solver"),
+        output_dir=stored.get("output_dir", "results"),
+        prior_alpha=stored.get("prior_alpha", 1.0),
+        prior_beta=stored.get("prior_beta", 1.0),
+        seed=stored.get("seed"),
+        max_concurrent_api=stored.get("max_concurrent_api", 20),
+        summarize_rounds=stored.get("summarize_rounds", False),
+        prompt_level=PromptLevel(stored.get("prompt_level", "standard")),
+    )
+
+    log.info("Resuming from %s", args.resume)
+    for gid in generator_ids:
+        state = tracker.get_generator_state(gid)
+        status = state["status"] if state else "unknown"
+        rounds_done = state.get("rounds_completed", 0) if state else 0
+        log.info("  %s: %s (%d/%d rounds)", gid, status, rounds_done, base_config.rounds)
+
+    return asyncio.run(run_multi_eval(generators, base_config, tracker=tracker))
 
 
 if __name__ == "__main__":

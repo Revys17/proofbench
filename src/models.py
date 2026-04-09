@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
@@ -44,7 +45,7 @@ class LLMResponse:
 ToolDef = dict[str, Any]
 
 
-class LLMClient:
+class LLMClient(ABC):
     """Provider-agnostic LLM client interface."""
 
     def __init__(self, max_concurrent: int = 20, cost_tracker: CostTracker | None = None) -> None:
@@ -69,9 +70,10 @@ class LLMClient:
                 max_tokens=max_tokens,
             )
         if self._cost_tracker and (response.usage.input_tokens or response.usage.output_tokens):
-            self._cost_tracker.record(model, response.usage.input_tokens, response.usage.output_tokens)
+            await self._cost_tracker.record(model, response.usage.input_tokens, response.usage.output_tokens)
         return response
 
+    @abstractmethod
     async def _send(
         self,
         *,
@@ -80,16 +82,17 @@ class LLMClient:
         messages: list[Any],
         tools: list[ToolDef],
         max_tokens: int = 16384,
-    ) -> LLMResponse:
-        raise NotImplementedError
+    ) -> LLMResponse: ...
 
+    @abstractmethod
     def format_assistant(self, response: LLMResponse) -> list[dict[str, Any]]:
         """Format assistant response as message(s) to append to history."""
-        raise NotImplementedError
+        ...
 
+    @abstractmethod
     def format_tool_results(self, results: list[ToolResult]) -> list[dict[str, Any]]:
         """Format tool results as message(s) to append to history."""
-        raise NotImplementedError
+        ...
 
 
 class AnthropicClient(LLMClient):

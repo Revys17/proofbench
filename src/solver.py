@@ -58,8 +58,10 @@ async def run_solver(
     calls_used = 0
     last_error: str | None = None
 
-    for _ in range(config.solver_max_calls + config.solver_max_calls):
-        # Allow up to 2x iterations (model may emit text turns without tool use)
+    # Allow up to 2x iterations: the model may emit text turns without calling
+    # a tool, so we need headroom beyond the tool-call budget.
+    max_iterations = config.solver_max_calls * 2
+    for _ in range(max_iterations):
         response = await llm.send(
             model=model.model_id,
             system=SOLVER_SYSTEM,

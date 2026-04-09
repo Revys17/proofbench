@@ -1,0 +1,485 @@
+{
+  "timestamp": "2026-04-09T23:15:07.272672+00:00",
+  "config": {
+    "generators": [
+      "claude-opus-4-6",
+      "claude-sonnet-4-6"
+    ],
+    "solvers": [
+      "claude-opus-4-6",
+      "claude-sonnet-4-6",
+      "claude-haiku-4-5-20251001"
+    ],
+    "rounds": 3,
+    "solver_max_calls": 10,
+    "attempts_during_loop": 3,
+    "attempts_reeval": 10,
+    "prompt_level": "detailed"
+  },
+  "generators": [
+    {
+      "generator": "claude-opus-4-6",
+      "generator_display_name": "claude-opus-4-6",
+      "anonymization": {
+        "model_self": {
+          "model_id": "claude-opus-4-6",
+          "display_name": "claude-opus-4-6"
+        },
+        "model_a": {
+          "model_id": "claude-sonnet-4-6",
+          "display_name": "claude-sonnet-4-6"
+        },
+        "model_b": {
+          "model_id": "claude-haiku-4-5-20251001",
+          "display_name": "claude-haiku-4-5-20251001"
+        }
+      },
+      "rounds": [
+        {
+          "round": 1,
+          "theorem_statement": "theorem round1_challenge (n : \u2115) (h : n > 0) : (2 * n + 1) ^ 2 = 4 * n * (n + 1) + 1",
+          "proof": ":= by ring",
+          "imports": "import Mathlib.Tactic",
+          "solver_results": [
+            {
+              "model": "model_self",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_b",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            }
+          ]
+        },
+        {
+          "round": 1,
+          "theorem_statement": "theorem round1_challenge (n : \u2115) (h : n > 0) : (2 * n + 1) ^ 2 = 4 * n * (n + 1) + 1",
+          "proof": ":= by ring",
+          "imports": "import Mathlib.Tactic",
+          "solver_results": [
+            {
+              "model": "model_self",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_b",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            }
+          ]
+        },
+        {
+          "round": 1,
+          "theorem_statement": "theorem round1_challenge (n : \u2115) (h : n > 0) : (2 * n + 1) ^ 2 = 4 * n * (n + 1) + 1",
+          "proof": ":= by ring",
+          "imports": "import Mathlib.Tactic",
+          "solver_results": [
+            {
+              "model": "model_self",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_b",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            }
+          ]
+        },
+        {
+          "round": 1,
+          "theorem_statement": "theorem round1_challenge (n : \u2115) (h : n > 0) : (2 * n + 1) ^ 2 = 4 * n * (n + 1) + 1",
+          "proof": ":= by ring",
+          "imports": "import Mathlib.Tactic",
+          "solver_results": [
+            {
+              "model": "model_self",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_b",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            }
+          ]
+        },
+        {
+          "round": 1,
+          "theorem_statement": "theorem round1_challenge (n : \u2115) (h : n > 0) : (2 * n + 1) ^ 2 = 4 * n * (n + 1) + 1",
+          "proof": ":= by ring",
+          "imports": "import Mathlib.Tactic",
+          "solver_results": [
+            {
+              "model": "model_self",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_b",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            }
+          ]
+        }
+      ],
+      "loop_scores": [
+        {
+          "theorem_id": "round_1",
+          "gap_score": 0.3309,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.8,
+          "other_solve_rates": {
+            "model_a": 0.8,
+            "model_b": 0.8
+          }
+        },
+        {
+          "theorem_id": "round_1",
+          "gap_score": 0.336,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.8,
+          "other_solve_rates": {
+            "model_a": 0.8,
+            "model_b": 0.8
+          }
+        },
+        {
+          "theorem_id": "round_1",
+          "gap_score": 0.3315,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.8,
+          "other_solve_rates": {
+            "model_a": 0.8,
+            "model_b": 0.8
+          }
+        },
+        {
+          "theorem_id": "round_1",
+          "gap_score": 0.3349,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.8,
+          "other_solve_rates": {
+            "model_a": 0.8,
+            "model_b": 0.8
+          }
+        },
+        {
+          "theorem_id": "round_1",
+          "gap_score": 0.3343,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.8,
+          "other_solve_rates": {
+            "model_a": 0.8,
+            "model_b": 0.8
+          }
+        }
+      ],
+      "best_submission": "round_1",
+      "final_score": {
+        "theorem_id": "round_1",
+        "gap_score": 0.327,
+        "raw_gap": 0.0,
+        "self_solve_rate": 0.9166666666666666,
+        "other_solve_rates": {
+          "model_a": 0.9166666666666666,
+          "model_b": 0.9166666666666666
+        }
+      },
+      "cost": {
+        "per_model": {
+          "claude-haiku-4-5-20251001": {
+            "input_tokens": 21450,
+            "output_tokens": 2998,
+            "api_calls": 20,
+            "cost_usd": 0.0292
+          },
+          "claude-opus-4-6": {
+            "input_tokens": 21470,
+            "output_tokens": 1550,
+            "api_calls": 20,
+            "cost_usd": 0.4383
+          },
+          "claude-sonnet-4-6": {
+            "input_tokens": 21470,
+            "output_tokens": 2049,
+            "api_calls": 20,
+            "cost_usd": 0.0951
+          }
+        },
+        "total_cost_usd": 0.5626
+      }
+    },
+    {
+      "generator": "claude-sonnet-4-6",
+      "generator_display_name": "claude-sonnet-4-6",
+      "anonymization": {
+        "model_self": {
+          "model_id": "claude-sonnet-4-6",
+          "display_name": "claude-sonnet-4-6"
+        },
+        "model_a": {
+          "model_id": "claude-opus-4-6",
+          "display_name": "claude-opus-4-6"
+        },
+        "model_b": {
+          "model_id": "claude-haiku-4-5-20251001",
+          "display_name": "claude-haiku-4-5-20251001"
+        }
+      },
+      "rounds": [
+        {
+          "round": 1,
+          "theorem_statement": "theorem sum_range_odd (n : \u2115) : \n  (\u2211 i \u2208 Finset.range n, (2 * i + 1)) = n ^ 2",
+          "proof": ":= by\n  induction n with\n  | zero => simp\n  | succ n ih =>\n    rw [Finset.sum_range_succ, ih]\n    ring",
+          "imports": "import Mathlib",
+          "solver_results": [
+            {
+              "model": "model_a",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_self",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_b",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            }
+          ]
+        },
+        {
+          "round": 1,
+          "theorem_statement": "theorem sum_range_odd (n : \u2115) : \n  (\u2211 i \u2208 Finset.range n, (2 * i + 1)) = n ^ 2",
+          "proof": ":= by\n  induction n with\n  | zero => simp\n  | succ n ih =>\n    rw [Finset.sum_range_succ, ih]\n    ring",
+          "imports": "import Mathlib",
+          "solver_results": [
+            {
+              "model": "model_a",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_self",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_b",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            }
+          ]
+        },
+        {
+          "round": 1,
+          "theorem_statement": "theorem sum_range_odd (n : \u2115) : \n  (\u2211 i \u2208 Finset.range n, (2 * i + 1)) = n ^ 2",
+          "proof": ":= by\n  induction n with\n  | zero => simp\n  | succ n ih =>\n    rw [Finset.sum_range_succ, ih]\n    ring",
+          "imports": "import Mathlib",
+          "solver_results": [
+            {
+              "model": "model_a",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_self",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_b",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            }
+          ]
+        },
+        {
+          "round": 1,
+          "theorem_statement": "theorem sum_range_odd (n : \u2115) : \n  (\u2211 i \u2208 Finset.range n, (2 * i + 1)) = n ^ 2",
+          "proof": ":= by\n  induction n with\n  | zero => simp\n  | succ n ih =>\n    rw [Finset.sum_range_succ, ih]\n    ring",
+          "imports": "import Mathlib",
+          "solver_results": [
+            {
+              "model": "model_a",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_self",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            },
+            {
+              "model": "model_b",
+              "solved": true,
+              "successes": 3,
+              "attempts": 3
+            }
+          ]
+        }
+      ],
+      "loop_scores": [
+        {
+          "theorem_id": "round_1",
+          "gap_score": 0.3261,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.8,
+          "other_solve_rates": {
+            "model_a": 0.8,
+            "model_b": 0.8
+          }
+        },
+        {
+          "theorem_id": "round_1",
+          "gap_score": 0.3312,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.8,
+          "other_solve_rates": {
+            "model_a": 0.8,
+            "model_b": 0.8
+          }
+        },
+        {
+          "theorem_id": "round_1",
+          "gap_score": 0.3407,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.8,
+          "other_solve_rates": {
+            "model_a": 0.8,
+            "model_b": 0.8
+          }
+        },
+        {
+          "theorem_id": "round_1",
+          "gap_score": 0.3356,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.8,
+          "other_solve_rates": {
+            "model_a": 0.8,
+            "model_b": 0.8
+          }
+        }
+      ],
+      "best_submission": "round_1",
+      "final_score": {
+        "theorem_id": "round_1",
+        "gap_score": 0.3326,
+        "raw_gap": 0.0,
+        "self_solve_rate": 0.9166666666666666,
+        "other_solve_rates": {
+          "model_a": 0.9166666666666666,
+          "model_b": 0.9166666666666666
+        }
+      },
+      "cost": {
+        "per_model": {
+          "claude-haiku-4-5-20251001": {
+            "input_tokens": 21450,
+            "output_tokens": 2998,
+            "api_calls": 20,
+            "cost_usd": 0.0292
+          },
+          "claude-opus-4-6": {
+            "input_tokens": 21470,
+            "output_tokens": 1550,
+            "api_calls": 20,
+            "cost_usd": 0.4383
+          },
+          "claude-sonnet-4-6": {
+            "input_tokens": 21470,
+            "output_tokens": 2049,
+            "api_calls": 20,
+            "cost_usd": 0.0951
+          }
+        },
+        "total_cost_usd": 0.5626
+      }
+    }
+  ],
+  "best_generator": {
+    "model": "claude-sonnet-4-6",
+    "gap_score": 0.3326,
+    "theorem_id": "round_1"
+  },
+  "cost": {
+    "per_model": {
+      "claude-haiku-4-5-20251001": {
+        "input_tokens": 21450,
+        "output_tokens": 2998,
+        "api_calls": 20,
+        "cost_usd": 0.0292
+      },
+      "claude-opus-4-6": {
+        "input_tokens": 21470,
+        "output_tokens": 1550,
+        "api_calls": 20,
+        "cost_usd": 0.4383
+      },
+      "claude-sonnet-4-6": {
+        "input_tokens": 21470,
+        "output_tokens": 2049,
+        "api_calls": 20,
+        "cost_usd": 0.0951
+      }
+    },
+    "total_cost_usd": 0.5626
+  }
+}

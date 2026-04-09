@@ -3,10 +3,10 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
-from .config import EvalConfig
+from .config import EvalConfig, PromptLevel
 from .lean import LeanCompiler
 from .models import LLMClient, ToolDef, ToolResult
-from .prompts import GENERATOR_SYSTEM
+from .prompts import GENERATOR_SYSTEMS
 
 log = logging.getLogger(__name__)
 
@@ -54,6 +54,7 @@ class TheoremSubmission:
 class SolveResult:
     anonymized_name: str
     solved: bool
+    successes: int
     attempts: int
 
 
@@ -65,6 +66,111 @@ class RoundResult:
 
 
 SolveCallback = Callable[[TheoremSubmission], Awaitable[tuple[SolveResult, ...]]]
+RoundCallback = Callable[[RoundResult, list[Any]], Awaitable[None]]
+SkipCallback = Callable[[int, list[Any]], Awaitable[None]]
+
+
+def _build_solve_feedback(
+    solve_results: tuple[SolveResult, ...],
+    current_round: int,
+    total_rounds: int,
+    prompt_level: PromptLevel,
+) -> str:
+    """Build the tool-result message after a successful compilation + solver run."""
+    self_result = next(
+        (sr for sr in solve_results if sr.anonymized_name == "model_self"),
+        None,
+    )
+    opponent_results = [
+        sr for sr in solve_results if sr.anonymized_name != "model_self"
+    ]
+    self_rate = (
+        (self_result.successes / self_result.attempts)
+        if self_result and self_result.attempts > 0
+        else 0.0
+    )
+    best_opp_rate = max(
+        (sr.successes / sr.attempts for sr in opponent_results if sr.attempts > 0),
+        default=0.0,
+    )
+
+    lines = [f"Round {current_round}/{total_rounds} solver results:"]
+    for sr in solve_results:
+        rate = sr.successes / sr.attempts if sr.attempts > 0 else 0.0
+        lines.append(
+            f"  {sr.anonymized_name}: {sr.successes}/{sr.attempts} "
+            f"({rate:.0%} solve rate)"
+        )
+
+    # Standard: add a one-line gap summary (factual, no advice)
+    if prompt_level == PromptLevel.STANDARD:
+        lines.append("")
+        lines.append(
+            f"Your model: {self_rate:.0%}, best opponent: {best_opp_rate:.0%}."
+        )
+
+    # Detailed: full diagnostic feedback with prescriptive advice
+    if prompt_level == PromptLevel.DETAILED:
+        lines.append("")
+        if self_rate == 0:
+            lines.append(
+                "PROBLEM: Your own model solved 0% — this scores zero regardless "
+                "of opponent results. Significantly simplify your next theorem. "
+                "A theorem you reliably solve (>80%) that opponents also solve "
+                "is better than one nobody can solve."
+            )
+        elif self_rate < 0.5:
+            lines.append(
+                f"WARNING: Your model's solve rate ({self_rate:.0%}) is too low. "
+                f"Even if opponents fail, low self-rate means uncertain posteriors "
+                f"and a weak gap score. Target 80%+ self-solve rate. Simplify."
+            )
+        elif self_rate >= 0.8 and best_opp_rate <= 0.3:
+            lines.append(
+                f"STRONG: Your model at {self_rate:.0%}, best opponent at "
+                f"{best_opp_rate:.0%}. This is a high-quality submission."
+            )
+        elif self_rate >= 0.5 and best_opp_rate < self_rate:
+            gap = self_rate - best_opp_rate
+            lines.append(
+                f"DECENT: Your model at {self_rate:.0%}, best opponent at "
+                f"{best_opp_rate:.0%} (gap: {gap:.0%}). Try to increase your "
+                f"model's reliability while keeping opponent rate low."
+            )
+        elif best_opp_rate >= self_rate:
+            lines.append(
+                f"NO GAP: Best opponent ({best_opp_rate:.0%}) matches or beats "
+                f"your model ({self_rate:.0%}). The theorem doesn't differentiate. "
+                f"Try a different mathematical area or proof strategy."
+            )
+
+    if current_round < total_rounds:
+        lines.append(f"\nProceed to Round {current_round + 1}.")
+
+    return "\n".join(lines)
+
+
+def _build_budget_exhausted_feedback(
+    error_msg: str,
+    skipped_round: int,
+    remaining_rounds: int,
+    prompt_level: PromptLevel,
+) -> str:
+    """Build the tool-result message when the call budget is exhausted."""
+    lines = [
+        f"Compilation FAILED. Call budget exhausted — Round {skipped_round} "
+        f"is SKIPPED (no theorem submitted, scores zero).",
+        error_msg,
+        "",
+        f"You have {remaining_rounds} round(s) remaining.",
+    ]
+    if prompt_level == PromptLevel.DETAILED:
+        lines.append(
+            "Simplify your approach — target a theorem you can prove "
+            "in fewer attempts. A submitted theorem that everyone solves "
+            "is better than no submission at all."
+        )
+    return "\n".join(lines)
 
 
 async def run_generator(
@@ -72,28 +178,57 @@ async def run_generator(
     llm: LLMClient,
     lean: LeanCompiler,
     solve_callback: SolveCallback,
+    *,
+    start_round: int = 0,
+    initial_messages: list[Any] | None = None,
+    prior_results: list[RoundResult] | None = None,
+    on_round_complete: RoundCallback | None = None,
+    on_round_skipped: SkipCallback | None = None,
+    anon_to_display: dict[str, str] | None = None,
 ) -> list[RoundResult]:
-    """Run the generator for `config.rounds` rounds, returning results per round."""
-    tools = [PROPOSE_THEOREM_TOOL]
-    messages: list[Any] = [{
-        "role": "user",
-        "content": (
-            f"Design and submit {config.rounds} theorem(s), one per round. "
-            f"You have {config.generator_max_calls} propose_theorem calls per round "
-            f"(failed compilations count against this budget). "
-            f"Each theorem should be solvable by a fresh copy of your model "
-            f"but not by other models. Start with Round 1."
-        ),
-    }]
+    """Run the generator for `config.rounds` rounds, returning results per round.
 
-    round_results: list[RoundResult] = []
-    current_round = 0
+    Args:
+        anon_to_display: maps anonymized names to display names for log output
+
+    For resume support:
+        start_round: round to resume from (0-indexed, number of completed rounds)
+        initial_messages: conversation history to restore
+        prior_results: RoundResults from completed rounds
+        on_round_complete: called after each successful round with (result, messages)
+        on_round_skipped: called after each skipped round with (round_number, messages)
+    """
+    system_prompt = GENERATOR_SYSTEMS[config.prompt_level]
+    tools = [PROPOSE_THEOREM_TOOL]
+
+    if initial_messages is not None:
+        messages: list[Any] = initial_messages
+    else:
+        messages = [{
+            "role": "user",
+            "content": (
+                f"Design and submit {config.rounds} theorem(s), one per round. "
+                f"You have {config.generator_max_calls} propose_theorem calls per round "
+                f"(failed compilations count against this budget). "
+                f"Each theorem should be solvable by a fresh copy of your model "
+                f"but not by other models. Start with Round 1."
+            ),
+        }]
+
+    round_results: list[RoundResult] = list(prior_results) if prior_results else []
+    current_round = start_round
     calls_this_round = 0
 
+    if start_round > 0:
+        log.info("Resuming generator from round %d/%d", start_round + 1, config.rounds)
+
     while current_round < config.rounds:
+        _round_completed_this_iter = False
+        _round_skipped_this_iter = False
+
         response = await llm.send(
             model=config.generator_model.model_id,
-            system=GENERATOR_SYSTEM,
+            system=system_prompt,
             messages=messages,
             tools=tools,
             max_tokens=config.generator_model.max_tokens,
@@ -139,14 +274,9 @@ async def run_generator(
                     remaining_rounds = config.rounds - skipped_round
                     tool_results.append(ToolResult(
                         tool_call_id=tc.id,
-                        content=(
-                            f"Compilation FAILED. Call budget exhausted — Round {skipped_round} "
-                            f"is SKIPPED (no theorem submitted, scores zero).\n"
-                            f"{error_msg}\n\n"
-                            f"You have {remaining_rounds} round(s) remaining. "
-                            f"Simplify your approach — target a theorem you can prove "
-                            f"in fewer attempts. A submitted theorem that everyone solves "
-                            f"is better than no submission at all."
+                        content=_build_budget_exhausted_feedback(
+                            error_msg, skipped_round, remaining_rounds,
+                            config.prompt_level,
                         ),
                     ))
                     log.warning(
@@ -157,6 +287,7 @@ async def run_generator(
                     )
                     current_round += 1
                     calls_this_round = 0
+                    _round_skipped_this_iter = True
                 else:
                     tool_results.append(ToolResult(
                         tool_call_id=tc.id,
@@ -169,6 +300,7 @@ async def run_generator(
 
             # Proof compiled — submit to solvers
             current_round += 1
+            _round_completed_this_iter = True
             submission = TheoremSubmission(
                 theorem_statement=theorem_statement,
                 proof=proof,
@@ -180,50 +312,19 @@ async def run_generator(
             solve_results = await solve_callback(submission)
             round_results.append(RoundResult(current_round, submission, solve_results))
 
-            self_result = next(
-                (sr for sr in solve_results if sr.anonymized_name == "model_self"),
-                None,
+            solver_summary = ", ".join(
+                f"{(anon_to_display or {}).get(sr.anonymized_name, sr.anonymized_name)}: "
+                f"{sr.successes}/{sr.attempts} solved"
+                for sr in solve_results
             )
-            opponent_results = [
-                sr for sr in solve_results if sr.anonymized_name != "model_self"
-            ]
-            self_solved = self_result.solved if self_result else False
-            opponents_solved = sum(1 for sr in opponent_results if sr.solved)
-
-            result_lines = [f"Round {current_round}/{config.rounds} solver results:"]
-            for sr in solve_results:
-                status = "SOLVED" if sr.solved else "FAILED"
-                result_lines.append(f"  {sr.anonymized_name}: {status}")
-
-            # Diagnostic feedback
-            if self_solved and opponents_solved == 0:
-                result_lines.append(
-                    "\nExcellent — only your model solved it. This is a strong submission."
-                )
-            elif self_solved and opponents_solved < len(opponent_results):
-                result_lines.append(
-                    f"\nPartial gap — {opponents_solved}/{len(opponent_results)} opponents "
-                    f"also solved it. Try to make it harder for them while keeping it "
-                    f"solvable for your model."
-                )
-            elif self_solved and opponents_solved == len(opponent_results):
-                result_lines.append(
-                    "\nNo gap — everyone solved it. Increase difficulty significantly."
-                )
-            elif not self_solved:
-                result_lines.append(
-                    "\nYour own model failed — this scores zero. Decrease difficulty "
-                    "so a fresh copy of your model can solve it."
-                )
-
-            if current_round < config.rounds:
-                result_lines.append(
-                    f"\nProceed to Round {current_round + 1}."
-                )
+            log.info("Round %d results: %s", current_round, solver_summary)
 
             tool_results.append(ToolResult(
                 tool_call_id=tc.id,
-                content="\n".join(result_lines),
+                content=_build_solve_feedback(
+                    solve_results, current_round, config.rounds,
+                    config.prompt_level,
+                ),
             ))
             calls_this_round = 0
 
@@ -240,6 +341,15 @@ async def run_generator(
                 messages[0],
                 {"role": "user", "content": summary},
             ]
+
+        # Checkpoint callbacks — only fire when a round actually completed or
+        # was skipped THIS iteration (not on every subsequent loop turn).
+        if _round_completed_this_iter:
+            if on_round_complete:
+                await on_round_complete(round_results[-1], messages)
+        elif _round_skipped_this_iter:
+            if on_round_skipped:
+                await on_round_skipped(current_round, messages)
 
     return round_results
 
@@ -262,7 +372,7 @@ async def _request_summary(
     summary_messages = [*messages, {"role": "user", "content": _SUMMARY_PROMPT}]
     response = await llm.send(
         model=config.generator_model.model_id,
-        system=GENERATOR_SYSTEM,
+        system=GENERATOR_SYSTEMS[config.prompt_level],
         messages=summary_messages,
         tools=[],
         max_tokens=config.generator_model.max_tokens,

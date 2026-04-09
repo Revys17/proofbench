@@ -1,8 +1,12 @@
 import asyncio
+import hashlib
+import logging
 import os
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 SORRY_WARNING = 'declaration uses `sorry`'
 
@@ -23,6 +27,9 @@ class LeanCompiler:
         self._semaphore = asyncio.Semaphore(max_concurrent)
         self._elan_bin = Path.home() / ".elan" / "bin"
         self._lean_path: str | None = None
+        self._cache: dict[str, LeanResult] = {}
+        self._cache_hits = 0
+        self._cache_misses = 0
 
     async def _get_lean_path(self) -> str:
         """Compute LEAN_PATH via `lake env` (cached after first call)."""
@@ -57,15 +64,30 @@ class LeanCompiler:
         return f"{imports}\n\n{theorem_statement} := by sorry\n"
 
     async def check(self, lean_code: str) -> LeanResult:
-        """Compile lean_code and return the result."""
+        """Compile lean_code and return the result (cached by content hash)."""
+        key = hashlib.sha256(lean_code.encode()).hexdigest()
+
+        if key in self._cache:
+            self._cache_hits += 1
+            log.debug("Lean cache hit (%d hits, %d misses)", self._cache_hits, self._cache_misses)
+            return self._cache[key]
+
+        self._cache_misses += 1
         tag = uuid.uuid4().hex[:8]
         tmp_file = self._project_path / f"_check_{tag}.lean"
         tmp_file.write_text(lean_code, encoding="utf-8")
 
         try:
-            return await self._run_lean(tmp_file)
+            result = await self._run_lean(tmp_file)
         finally:
             tmp_file.unlink(missing_ok=True)
+
+        self._cache[key] = result
+        return result
+
+    @property
+    def cache_stats(self) -> dict[str, int]:
+        return {"hits": self._cache_hits, "misses": self._cache_misses}
 
     async def _run_lean(self, file_path: Path) -> LeanResult:
         lean_path = await self._get_lean_path()

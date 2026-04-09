@@ -1,4 +1,5 @@
 import asyncio
+import contextvars
 import json
 import logging
 import random
@@ -6,13 +7,55 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .config import EvalConfig, ModelConfig
+from .costs import CostTracker
 from .generator import RoundResult, SolveResult, TheoremSubmission, run_generator
 from .lean import LeanCompiler
-from .models import LLMClient
+from .models import LLMClient, create_client
 from .scoring import TheoremScore, score_theorem, select_best
 from .solver import SolverAttemptResult, run_solver
 
 log = logging.getLogger(__name__)
+
+# Tracks which generator is active in the current async task.
+_current_generator: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "_current_generator", default="",
+)
+
+
+class _GeneratorTagFilter(logging.Filter):
+    """Injects 'generator' field into every log record from the contextvar."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.generator = _current_generator.get()  # type: ignore[attr-defined]
+        return True
+
+
+class _GeneratorMatchFilter(logging.Filter):
+    """Only passes records whose generator tag matches."""
+
+    def __init__(self, generator_name: str) -> None:
+        super().__init__()
+        self._name = generator_name
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return getattr(record, "generator", "") == self._name
+
+
+class ClientRegistry:
+    """Lazily creates one LLMClient per provider."""
+
+    def __init__(self, max_concurrent: int = 20, cost_tracker: CostTracker | None = None) -> None:
+        self._clients: dict[str, LLMClient] = {}
+        self._max_concurrent = max_concurrent
+        self.cost_tracker = cost_tracker or CostTracker()
+
+    def get(self, provider: str) -> LLMClient:
+        if provider not in self._clients:
+            self._clients[provider] = create_client(provider, self._max_concurrent, self.cost_tracker)
+        return self._clients[provider]
+
+    def for_model(self, model: ModelConfig) -> LLMClient:
+        return self.get(model.provider)
 
 
 def _build_anon_map(
@@ -39,12 +82,14 @@ def _build_anon_map(
 async def _run_solver_attempts(
     config: EvalConfig,
     model: ModelConfig,
-    llm: LLMClient,
+    clients: ClientRegistry,
     lean: LeanCompiler,
     submission: TheoremSubmission,
     attempts: int,
 ) -> tuple[int, int]:
     """Run solver for N attempts in parallel. Return (successes, attempts)."""
+    llm = clients.for_model(model)
+
     if attempts == 1:
         result = await run_solver(
             config=config,
@@ -82,13 +127,19 @@ async def _run_solver_attempts(
     return (successes, attempts)
 
 
-async def run_eval(config: EvalConfig) -> dict:
-    """Run the full ProofBench evaluation."""
-    llm = LLMClient.create()
-    lean = LeanCompiler(
-        project_path=config.lean_project_path,
-        timeout=config.lean_timeout_seconds,
-    )
+async def run_eval(
+    config: EvalConfig,
+    clients: ClientRegistry | None = None,
+    lean: LeanCompiler | None = None,
+) -> dict:
+    """Run the ProofBench evaluation for a single generator model."""
+    if clients is None:
+        clients = ClientRegistry(config.max_concurrent_api)
+    if lean is None:
+        lean = LeanCompiler(
+            project_path=config.lean_project_path,
+            timeout=config.lean_timeout_seconds,
+        )
     anon_map = _build_anon_map(config.generator_model, config.solver_models)
 
     log.info("Starting eval: generator=%s, solvers=%s",
@@ -100,7 +151,7 @@ async def run_eval(config: EvalConfig) -> dict:
     async def solve_callback(submission: TheoremSubmission) -> tuple[SolveResult, ...]:
         tasks = [
             _run_solver_attempts(
-                config, sm, llm, lean, submission,
+                config, sm, clients, lean, submission,
                 attempts=config.attempts_during_loop,
             )
             for sm in config.solver_models
@@ -117,11 +168,14 @@ async def run_eval(config: EvalConfig) -> dict:
 
     # Phase 1: Generator loop
     log.info("=== Phase 1: Generator loop (%d rounds) ===", config.rounds)
-    round_results = await run_generator(config, llm, lean, solve_callback)
+    generator_llm = clients.for_model(config.generator_model)
+    round_results = await run_generator(config, generator_llm, lean, solve_callback)
 
     if not round_results:
         log.warning("Generator produced no valid theorems.")
-        return _build_output(config, anon_map, round_results, [], None, None)
+        clients.cost_tracker.log_summary()
+        return _build_generator_output(config, anon_map, round_results, [], None, None,
+                                       cost=clients.cost_tracker.summary())
 
     # Score each round's theorem from loop data
     loop_scores = _score_round_results(round_results, config)
@@ -140,11 +194,114 @@ async def run_eval(config: EvalConfig) -> dict:
     final_score: TheoremScore | None = None
     if best_round is not None:
         log.info("=== Phase 2: Re-evaluation (%d attempts) ===", config.attempts_reeval)
-        final_score = await _reeval_theorem(config, llm, lean, anon_map, best_round)
+        final_score = await _reeval_theorem(config, clients, lean, anon_map, best_round)
         log.info("Final score: gap=%.3f, raw_gap=%.3f",
                  final_score.gap_score, final_score.raw_gap)
 
-    return _build_output(config, anon_map, round_results, loop_scores, best_loop, final_score)
+    clients.cost_tracker.log_summary()
+    return _build_generator_output(config, anon_map, round_results, loop_scores, best_loop, final_score,
+                                   cost=clients.cost_tracker.summary())
+
+
+async def run_multi_eval(
+    generator_models: list[ModelConfig],
+    base_config: EvalConfig,
+) -> dict:
+    """Run ProofBench evaluation for multiple generator models concurrently.
+
+    Each generator gets an independent eval run with the same solver set.
+    Returns a combined output with per-generator results and overall comparison.
+    """
+    clients = ClientRegistry(base_config.max_concurrent_api)
+    lean = LeanCompiler(
+        project_path=base_config.lean_project_path,
+        timeout=base_config.lean_timeout_seconds,
+    )
+
+    # Set up per-generator log files
+    log_dir = Path(base_config.output_dir) / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+
+    # Add the tag filter to the root logger so all records get the generator field
+    root = logging.getLogger()
+    tag_filter = _GeneratorTagFilter()
+    root.addFilter(tag_filter)
+
+    file_handlers: list[logging.FileHandler] = []
+    for g in generator_models:
+        log_path = log_dir / f"{g.display_name}_{ts}.log"
+        fh = logging.FileHandler(log_path)
+        fh.setFormatter(logging.Formatter(
+            "%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+            datefmt="%H:%M:%S",
+        ))
+        fh.addFilter(_GeneratorMatchFilter(g.display_name))
+        fh.setLevel(logging.DEBUG)
+        root.addHandler(fh)
+        file_handlers.append(fh)
+
+    # Update console formatter to include generator prefix
+    for handler in root.handlers:
+        if isinstance(handler, logging.StreamHandler) and handler not in file_handlers:
+            handler.setFormatter(logging.Formatter(
+                "%(asctime)s %(levelname)-8s [%(generator)s] %(name)s: %(message)s",
+                datefmt="%H:%M:%S",
+            ))
+
+    async def _run_one(generator: ModelConfig) -> dict:
+        _current_generator.set(generator.display_name)
+
+        # Ensure this generator's model is in the solver list
+        solver_ids = {sm.model_id for sm in base_config.solver_models}
+        if generator.model_id in solver_ids:
+            solvers = base_config.solver_models
+        else:
+            solvers = (generator, *base_config.solver_models)
+
+        config = EvalConfig(
+            generator_model=generator,
+            solver_models=solvers,
+            rounds=base_config.rounds,
+            solver_max_calls=base_config.solver_max_calls,
+            generator_max_calls=base_config.generator_max_calls,
+            attempts_during_loop=base_config.attempts_during_loop,
+            attempts_reeval=base_config.attempts_reeval,
+            lean_timeout_seconds=base_config.lean_timeout_seconds,
+            lean_project_path=base_config.lean_project_path,
+            output_dir=base_config.output_dir,
+            prior_alpha=base_config.prior_alpha,
+            prior_beta=base_config.prior_beta,
+            seed=base_config.seed,
+            max_concurrent_api=base_config.max_concurrent_api,
+        )
+
+        log.info(">>> Starting generator: %s <<<", generator.display_name)
+        try:
+            return await run_eval(config, clients=clients, lean=lean)
+        except Exception:
+            log.exception("Generator %s failed", generator.display_name)
+            return {
+                "generator": generator.model_id,
+                "error": f"Generator {generator.display_name} failed",
+                "final_score": None,
+            }
+
+    generator_results = await asyncio.gather(
+        *[_run_one(g) for g in generator_models]
+    )
+
+    # Clean up per-generator log handlers
+    for fh in file_handlers:
+        fh.close()
+        root.removeHandler(fh)
+    root.removeFilter(tag_filter)
+
+    log.info("Per-generator logs written to %s/", log_dir)
+
+    clients.cost_tracker.log_summary()
+    return _build_multi_output(base_config, generator_models, list(generator_results),
+                               cost=clients.cost_tracker.summary())
 
 
 def _score_round_results(
@@ -177,7 +334,7 @@ def _score_round_results(
 
 async def _reeval_theorem(
     config: EvalConfig,
-    llm: LLMClient,
+    clients: ClientRegistry,
     lean: LeanCompiler,
     anon_map: dict[str, str],
     round_result: RoundResult,
@@ -185,7 +342,7 @@ async def _reeval_theorem(
     """Re-evaluate a theorem with more solver attempts (no early stopping)."""
     tasks = [
         _run_solver_attempts(
-            config, sm, llm, lean, round_result.submission,
+            config, sm, clients, lean, round_result.submission,
             attempts=config.attempts_reeval,
         )
         for sm in config.solver_models
@@ -215,25 +372,19 @@ async def _reeval_theorem(
     )
 
 
-def _build_output(
+def _build_generator_output(
     config: EvalConfig,
     anon_map: dict[str, str],
     round_results: list[RoundResult],
     loop_scores: list[TheoremScore],
     best_loop: TheoremScore | None,
     final_score: TheoremScore | None,
+    cost: dict | None = None,
 ) -> dict:
-    """Build the JSON output dict."""
+    """Build the output dict for a single generator run."""
     output = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "config": {
-            "generator": config.generator_model.model_id,
-            "solvers": [sm.model_id for sm in config.solver_models],
-            "rounds": config.rounds,
-            "solver_max_calls": config.solver_max_calls,
-            "attempts_during_loop": config.attempts_during_loop,
-            "attempts_reeval": config.attempts_reeval,
-        },
+        "generator": config.generator_model.model_id,
+        "generator_display_name": config.generator_model.display_name,
         "anonymization": {v: k for k, v in anon_map.items()},
         "rounds": [
             {
@@ -267,6 +418,46 @@ def _build_output(
             "other_solve_rates": final_score.other_solve_rates,
         } if final_score else None,
     }
+    if cost:
+        output["cost"] = cost
+    return output
+
+
+def _build_multi_output(
+    config: EvalConfig,
+    generator_models: list[ModelConfig],
+    generator_results: list[dict],
+    cost: dict | None = None,
+) -> dict:
+    """Build combined output for a multi-generator eval."""
+    # Find the generator with the best final gap score
+    best_generator: dict | None = None
+    best_gap = -1.0
+    for gr in generator_results:
+        fs = gr.get("final_score")
+        if fs and fs["gap_score"] > best_gap:
+            best_gap = fs["gap_score"]
+            best_generator = gr
+
+    output = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "config": {
+            "generators": [g.model_id for g in generator_models],
+            "solvers": [sm.model_id for sm in config.solver_models],
+            "rounds": config.rounds,
+            "solver_max_calls": config.solver_max_calls,
+            "attempts_during_loop": config.attempts_during_loop,
+            "attempts_reeval": config.attempts_reeval,
+        },
+        "generators": generator_results,
+        "best_generator": {
+            "model": best_generator["generator"],
+            "gap_score": best_gap,
+            "theorem_id": best_generator["final_score"]["theorem_id"],
+        } if best_generator and best_generator.get("final_score") else None,
+    }
+    if cost:
+        output["cost"] = cost
 
     output_dir = Path(config.output_dir)
     output_dir.mkdir(exist_ok=True)

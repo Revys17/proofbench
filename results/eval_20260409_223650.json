@@ -1,0 +1,700 @@
+{
+  "timestamp": "2026-04-09T22:36:50.725749+00:00",
+  "config": {
+    "generators": [
+      "claude-opus-4-6",
+      "claude-sonnet-4-6"
+    ],
+    "solvers": [
+      "claude-opus-4-6",
+      "claude-sonnet-4-6",
+      "claude-haiku-4-5-20251001"
+    ],
+    "rounds": 10,
+    "solver_max_calls": 10,
+    "attempts_during_loop": 10,
+    "attempts_reeval": 30
+  },
+  "generators": [
+    {
+      "generator": "claude-opus-4-6",
+      "generator_display_name": "opus-4.6",
+      "anonymization": {
+        "model_self": "claude-opus-4-6",
+        "model_a": "claude-sonnet-4-6",
+        "model_b": "claude-haiku-4-5-20251001"
+      },
+      "rounds": [
+        {
+          "round": 1,
+          "theorem_statement": "theorem round1_challenge (n : \u2124) (h : n > 0) : (2 * n + 1) ^ 2 - (2 * n - 1) ^ 2 = 8 * n",
+          "proof": ":= by ring",
+          "imports": "import Mathlib.Tactic",
+          "solver_results": [
+            {
+              "model": "model_self",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_b",
+              "solved": true,
+              "attempts": 10
+            }
+          ]
+        },
+        {
+          "round": 2,
+          "theorem_statement": "theorem round2_challenge (a b c : \u211d) (h1 : a + b + c = 0) (h2 : a * b + b * c + c * a = -1) : a ^ 2 + b ^ 2 + c ^ 2 = 2",
+          "proof": ":= by nlinarith [sq_nonneg (a + b + c), sq_abs a, sq_abs b, sq_abs c]",
+          "imports": "import Mathlib.Tactic",
+          "solver_results": [
+            {
+              "model": "model_self",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_b",
+              "solved": true,
+              "attempts": 10
+            }
+          ]
+        },
+        {
+          "round": 3,
+          "theorem_statement": "theorem round3_challenge : \u2200 n : \u2115, n \u2265 1 \u2192 (\u2211 i \u2208 Finset.range n, (2 * i + 1)) = n ^ 2",
+          "proof": ":= by\n  intro n hn\n  induction n with\n  | zero => omega\n  | succ k ih =>\n    rw [Finset.sum_range_succ]\n    cases k with\n    | zero => simp\n    | succ m =>\n      have hm : m + 1 \u2265 1 := by omega\n      rw [ih hm]\n      ring",
+          "imports": "import Mathlib",
+          "solver_results": [
+            {
+              "model": "model_self",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_b",
+              "solved": true,
+              "attempts": 10
+            }
+          ]
+        },
+        {
+          "round": 4,
+          "theorem_statement": "theorem round4_challenge (n : \u2115) (hn : n \u2265 2) : \n  \u2203 (a b : \u2115), a \u2265 1 \u2227 b \u2265 1 \u2227 a + b = n \u2227 Nat.Coprime a b",
+          "proof": ":= by\n  use 1, n - 1\n  refine \u27e8le_refl 1, by omega, by omega, ?_\u27e9\n  exact Nat.coprime_one_left (n - 1)",
+          "imports": "import Mathlib",
+          "solver_results": [
+            {
+              "model": "model_self",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_b",
+              "solved": true,
+              "attempts": 10
+            }
+          ]
+        },
+        {
+          "round": 5,
+          "theorem_statement": "theorem round5_challenge (f : \u2124 \u2192 \u2124) (hf : \u2200 x y : \u2124, f (x + y) + f (x - y) = 2 * f x + 2 * f y) \n  (h0 : f 0 = 0) : \u2200 n : \u2124, f n = n ^ 2 * f 1",
+          "proof": ":= by\n  have key : \u2200 n : \u2124, f (n + 1) + f (n - 1) = 2 * f n + 2 * f 1 := fun n => hf n 1\n  have step : \u2200 n : \u2124, f (n + 1) = 2 * f n - f (n - 1) + 2 * f 1 := fun n => by linarith [key n]\n  have neg : \u2200 x : \u2124, f (-x) = f x := by\n    intro x; have h2 := hf 0 x; simp [h0] at h2; linarith\n  suffices h : \u2200 n : \u2115, f (n : \u2124) = (n : \u2124) ^ 2 * f 1 by\n    intro n\n    obtain \u27e8k, rfl | rfl\u27e9 := Int.eq_nat_or_neg n\n    \u00b7 exact h k\n    \u00b7 rw [neg, h k]; ring\n  intro n\n  induction n using Nat.strongRecOn with\n  | ind n ih =>\n    match n with\n    | 0 => simp [h0]\n    | 1 => simp\n    | (k + 2) =>\n      have ih1 : f (\u2191(k + 1) : \u2124) = (\u2191(k + 1) : \u2124) ^ 2 * f 1 := ih (k + 1) (by omega)\n      have ih0 : f (\u2191k : \u2124) = (\u2191k : \u2124) ^ 2 * f 1 := ih k (by omega)\n      have hstep := step (\u2191(k + 1) : \u2124)\n      have hc1 : (\u2191(k + 1) : \u2124) - 1 = \u2191k := by push_cast; ring\n      rw [hc1] at hstep\n      have hc2 : (\u2191(k + 1) : \u2124) + 1 = \u2191(k + 2) := by push_cast; ring\n      rw [hc2] at hstep\n      rw [ih1, ih0] at hstep\n      rw [hstep]; push_cast; ring",
+          "imports": "import Mathlib",
+          "solver_results": [
+            {
+              "model": "model_self",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_b",
+              "solved": false,
+              "attempts": 10
+            }
+          ]
+        },
+        {
+          "round": 6,
+          "theorem_statement": "theorem round6_challenge (f : \u2115 \u2192 \u2124) (hf : \u2200 n, f (n + 2) = 3 * f (n + 1) - 2 * f n)\n  (h0 : f 0 = 1) (h1 : f 1 = 3) : \u2200 n : \u2115, f n = 2 ^ (n + 1) - 1",
+          "proof": ":= by\n  have key : \u2200 n : \u2115, f n = 2 ^ (n + 1) - 1 := by\n    intro n\n    induction n using Nat.strongRecOn with\n    | ind n ih =>\n      match n with\n      | 0 => simp [h0]\n      | 1 => simp [h1]\n      | (k + 2) =>\n        rw [hf k]\n        have ih1 := ih (k + 1) (by omega)\n        have ih0 := ih k (by omega)\n        rw [ih1, ih0]\n        have : (2 : \u2124) ^ (k + 2 + 1) = 2 * 2 ^ (k + 1 + 1) := by ring\n        push_cast\n        ring\n  exact key",
+          "imports": "import Mathlib",
+          "solver_results": [
+            {
+              "model": "model_self",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_b",
+              "solved": true,
+              "attempts": 10
+            }
+          ]
+        },
+        {
+          "round": 7,
+          "theorem_statement": "theorem round7_challenge : \u2200 (n : \u2115), n \u2265 1 \u2192 \n  3 * (\u2211 k \u2208 Finset.range n, (k + 1) * (k + 2)) = n * (n + 1) * (n + 2)",
+          "proof": ":= by\n  intro n hn\n  induction n with\n  | zero => omega\n  | succ m ih =>\n    rw [Finset.sum_range_succ, mul_add]\n    cases m with\n    | zero => simp\n    | succ k =>\n      rw [ih (by omega)]\n      ring",
+          "imports": "import Mathlib",
+          "solver_results": [
+            {
+              "model": "model_self",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_b",
+              "solved": true,
+              "attempts": 10
+            }
+          ]
+        },
+        {
+          "round": 8,
+          "theorem_statement": "theorem round8_challenge (f : \u2124 \u2192 \u2124) \n  (h1 : \u2200 m n : \u2124, f (m + n) + f (m * n - 1) = f m * f n + 1)\n  (h2 : f 0 = 1) (h3 : f 1 = 1) : \u2200 n : \u2124, f n = 1",
+          "proof": ":= by\n  have hm1 : f (-1) = 1 := by\n    have := h1 0 0; simp [h2] at this; linarith\n  have recur : \u2200 n : \u2124, f (n + 1) + f (n - 1) = f n + 1 := by\n    intro n\n    have key := h1 1 n\n    simp only [h3, one_mul] at key\n    have heq : (1 : \u2124) + n = n + 1 := add_comm 1 n\n    rw [heq] at key\n    linarith\n  have hf2 : f 2 = 1 := by\n    have := h1 1 1; simp [h3, h2] at this; linarith\n  have hm2 : f (-2) = 1 := by\n    have hr := recur (-1)\n    simp only [show (-1 : \u2124) + 1 = 0 from by ring, show (-1 : \u2124) - 1 = -2 from by ring] at hr\n    rw [h2, hm1] at hr; linarith\n  suffices hnat : \u2200 n : \u2115, f (n : \u2124) = 1 \u2227 f (-(n : \u2124)) = 1 by\n    intro n\n    obtain \u27e8k, rfl | rfl\u27e9 := Int.eq_nat_or_neg n\n    \u00b7 exact (hnat k).1\n    \u00b7 exact (hnat k).2\n  intro n\n  induction n using Nat.strongRecOn with\n  | ind n ih =>\n    match n with\n    | 0 => exact \u27e8h2, by simp [h2]\u27e9\n    | 1 => exact \u27e8h3, by simp [hm1]\u27e9\n    | 2 => exact \u27e8hf2, by simpa using hm2\u27e9\n    | (k + 3) =>\n      have ih2 := (ih (k + 2) (by omega)).1\n      have ih1 := (ih (k + 1) (by omega)).1\n      have ihn2 := (ih (k + 2) (by omega)).2\n      have ihn1 := (ih (k + 1) (by omega)).2\n      constructor\n      \u00b7 have hr := recur (\u2191(k + 2) : \u2124)\n        have hc1 : (\u2191(k + 2) : \u2124) + 1 = \u2191(k + 3) := by push_cast; ring\n        have hc2 : (\u2191(k + 2) : \u2124) - 1 = \u2191(k + 1) := by push_cast; ring\n        rw [hc1, hc2, ih2, ih1] at hr; linarith\n      \u00b7 have hr := recur (-(\u2191(k + 2) : \u2124))\n        have hc3 : -(\u2191(k + 2) : \u2124) + 1 = -(\u2191(k + 1) : \u2124) := by push_cast; ring\n        have hc4 : -(\u2191(k + 2) : \u2124) - 1 = -(\u2191(k + 3) : \u2124) := by push_cast; ring\n        rw [hc3, hc4, ihn1, ihn2] at hr; linarith",
+          "imports": "import Mathlib",
+          "solver_results": [
+            {
+              "model": "model_self",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_b",
+              "solved": false,
+              "attempts": 10
+            }
+          ]
+        },
+        {
+          "round": 9,
+          "theorem_statement": "theorem round9_challenge (g : \u2124 \u2192 \u2124) \n  (hg : \u2200 a b : \u2124, g (a ^ 2 + b) = g (b ^ 2 + a))\n  (hg0 : g 0 = 0) : g 1 = g 1 \u2227 \u2200 n : \u2124, g (n ^ 4 + n) = g (n ^ 2 + n ^ 2)",
+          "proof": ":= by\n  constructor\n  \u00b7 rfl\n  \u00b7 intro n\n    have h1 := hg (n ^ 2) n\n    have h2 := hg n (n ^ 2)\n    -- h1: g ((n^2)^2 + n) = g (n^2 + n^2)\n    -- h2: g (n^2 + n^2) = g ((n^2)^2 + n)\n    -- So g(n^4 + n) = g(n^2 + n^2)\n    have : (n ^ 2) ^ 2 = n ^ 4 := by ring\n    rw [this] at h1\n    exact h1",
+          "imports": "import Mathlib",
+          "solver_results": [
+            {
+              "model": "model_self",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_b",
+              "solved": true,
+              "attempts": 10
+            }
+          ]
+        },
+        {
+          "round": 10,
+          "theorem_statement": "theorem round10_challenge (f : \u2124 \u2192 \u2124) \n  (hf1 : \u2200 x : \u2124, f (f x) = x + 2)\n  (hf2 : f 0 = 1) : \u2200 n : \u2115, f (2 * n) = 2 * n + 1 \u2227 f (2 * n + 1) = 2 * n + 2",
+          "proof": ":= by\n  intro n\n  induction n with\n  | zero =>\n    constructor\n    \u00b7 simpa using hf2\n    \u00b7 have := hf1 0; rw [hf2] at this; simpa using this\n  | succ k ih =>\n    obtain \u27e8ihk1, ihk2\u27e9 := ih\n    have hfk2 : f (2 * \u2191k + 2) = 2 * \u2191k + 3 := by\n      have h := hf1 (2 * \u2191k + 1)\n      rw [ihk2] at h; linarith\n    have hfk3 : f (2 * \u2191k + 3) = 2 * \u2191k + 4 := by\n      have h := hf1 (2 * \u2191k + 2)\n      rw [hfk2] at h; linarith\n    constructor\n    \u00b7 convert hfk2 using 1 <;> push_cast <;> ring\n    \u00b7 convert hfk3 using 1 <;> push_cast <;> ring",
+          "imports": "import Mathlib",
+          "solver_results": [
+            {
+              "model": "model_self",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_b",
+              "solved": true,
+              "attempts": 10
+            }
+          ]
+        }
+      ],
+      "loop_scores": [
+        {
+          "theorem_id": "round_1",
+          "gap_score": 0.3377,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.16666666666666666,
+          "other_solve_rates": {
+            "model_a": 0.16666666666666666,
+            "model_b": 0.16666666666666666
+          }
+        },
+        {
+          "theorem_id": "round_2",
+          "gap_score": 0.3348,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.16666666666666666,
+          "other_solve_rates": {
+            "model_a": 0.16666666666666666,
+            "model_b": 0.16666666666666666
+          }
+        },
+        {
+          "theorem_id": "round_3",
+          "gap_score": 0.3295,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.16666666666666666,
+          "other_solve_rates": {
+            "model_a": 0.16666666666666666,
+            "model_b": 0.16666666666666666
+          }
+        },
+        {
+          "theorem_id": "round_4",
+          "gap_score": 0.3362,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.16666666666666666,
+          "other_solve_rates": {
+            "model_a": 0.16666666666666666,
+            "model_b": 0.16666666666666666
+          }
+        },
+        {
+          "theorem_id": "round_5",
+          "gap_score": 0.4382,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.16666666666666666,
+          "other_solve_rates": {
+            "model_a": 0.16666666666666666,
+            "model_b": 0.08333333333333333
+          }
+        },
+        {
+          "theorem_id": "round_6",
+          "gap_score": 0.3328,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.16666666666666666,
+          "other_solve_rates": {
+            "model_a": 0.16666666666666666,
+            "model_b": 0.16666666666666666
+          }
+        },
+        {
+          "theorem_id": "round_7",
+          "gap_score": 0.3357,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.16666666666666666,
+          "other_solve_rates": {
+            "model_a": 0.16666666666666666,
+            "model_b": 0.16666666666666666
+          }
+        },
+        {
+          "theorem_id": "round_8",
+          "gap_score": 0.431,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.16666666666666666,
+          "other_solve_rates": {
+            "model_a": 0.16666666666666666,
+            "model_b": 0.08333333333333333
+          }
+        },
+        {
+          "theorem_id": "round_9",
+          "gap_score": 0.3356,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.16666666666666666,
+          "other_solve_rates": {
+            "model_a": 0.16666666666666666,
+            "model_b": 0.16666666666666666
+          }
+        },
+        {
+          "theorem_id": "round_10",
+          "gap_score": 0.332,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.16666666666666666,
+          "other_solve_rates": {
+            "model_a": 0.16666666666666666,
+            "model_b": 0.16666666666666666
+          }
+        }
+      ],
+      "best_submission": "round_5",
+      "final_score": {
+        "theorem_id": "round_5",
+        "gap_score": 0.3028,
+        "raw_gap": -0.03125,
+        "self_solve_rate": 0.90625,
+        "other_solve_rates": {
+          "model_a": 0.9375,
+          "model_b": 0.03125
+        }
+      }
+    },
+    {
+      "generator": "claude-sonnet-4-6",
+      "generator_display_name": "sonnet-4.6",
+      "anonymization": {
+        "model_self": "claude-sonnet-4-6",
+        "model_a": "claude-haiku-4-5-20251001",
+        "model_b": "claude-opus-4-6"
+      },
+      "rounds": [
+        {
+          "round": 1,
+          "theorem_statement": "theorem sum_of_squares_mod_four (n : \u2124) : (2 * n + 1) ^ 2 % 4 = 1",
+          "proof": ":= by ring_nf; omega",
+          "imports": "import Mathlib.Tactic",
+          "solver_results": [
+            {
+              "model": "model_b",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_self",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "attempts": 10
+            }
+          ]
+        },
+        {
+          "round": 2,
+          "theorem_statement": "theorem nat_coprime_self_add_one (n : \u2115) : Nat.Coprime n (n + 1)",
+          "proof": ":= by\n  unfold Nat.Coprime\n  induction n with\n  | zero => simp\n  | succ n ih =>\n    rw [Nat.gcd_comm]\n    rw [Nat.gcd_rec]\n    simp [Nat.add_mod_right]",
+          "imports": "import Mathlib.Data.Nat.GCD.Basic",
+          "solver_results": [
+            {
+              "model": "model_b",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_self",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "attempts": 10
+            }
+          ]
+        },
+        {
+          "round": 3,
+          "theorem_statement": "theorem int_sq_add_sq_odd_mod8 (a b : \u2124) (ha : a % 2 = 1) (hb : b % 2 = 1) : (a ^ 2 + b ^ 2) % 8 = 2",
+          "proof": ":= by\n  have ha8 : a % 8 = 1 \u2228 a % 8 = 3 \u2228 a % 8 = 5 \u2228 a % 8 = 7 := by omega\n  have hb8 : b % 8 = 1 \u2228 b % 8 = 3 \u2228 b % 8 = 5 \u2228 b % 8 = 7 := by omega\n  have key_a : a ^ 2 % 8 = 1 := by\n    have eq_a : a = 8 * (a / 8) + a % 8 := (Int.ediv_add_emod a 8).symm\n    rcases ha8 with h | h | h | h <;> (rw [eq_a, h]; ring_nf; omega)\n  have key_b : b ^ 2 % 8 = 1 := by\n    have eq_b : b = 8 * (b / 8) + b % 8 := (Int.ediv_add_emod b 8).symm\n    rcases hb8 with h | h | h | h <;> (rw [eq_b, h]; ring_nf; omega)\n  omega",
+          "imports": "import Mathlib.Tactic",
+          "solver_results": [
+            {
+              "model": "model_b",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_self",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_a",
+              "solved": false,
+              "attempts": 10
+            }
+          ]
+        },
+        {
+          "round": 5,
+          "theorem_statement": "theorem nat_fib_coprime_succ (n : \u2115) : Nat.Coprime (Nat.fib n) (Nat.fib (n + 1))",
+          "proof": ":= Nat.fib_coprime_fib_succ n",
+          "imports": "import Mathlib.Data.Nat.Fib.Basic",
+          "solver_results": [
+            {
+              "model": "model_b",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_self",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "attempts": 10
+            }
+          ]
+        },
+        {
+          "round": 6,
+          "theorem_statement": "theorem list_length_filter_le (l : List \u2115) (p : \u2115 \u2192 Bool) : (l.filter p).length \u2264 l.length",
+          "proof": ":= List.length_filter_le p l",
+          "imports": "import Mathlib.Data.List.Basic",
+          "solver_results": [
+            {
+              "model": "model_b",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_self",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "attempts": 10
+            }
+          ]
+        },
+        {
+          "round": 7,
+          "theorem_statement": "theorem nat_prime_not_dvd_of_lt (p n : \u2115) (hp : p.Prime) (hn : 0 < n) (hlt : n < p) : \u00ac p \u2223 n",
+          "proof": ":= by\n  intro h\n  have := Nat.le_of_dvd hn h\n  omega",
+          "imports": "import Mathlib.Data.Nat.Prime.Basic",
+          "solver_results": [
+            {
+              "model": "model_b",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_self",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "attempts": 10
+            }
+          ]
+        },
+        {
+          "round": 8,
+          "theorem_statement": "theorem sum_arithmetic_progression (n : \u2115) (a d : \u2124) : \n    2 * (Finset.range n).sum (fun i => a + d * i) = n * (2 * a + d * (n - 1))",
+          "proof": ":= by\n  induction n with\n  | zero => simp\n  | succ n ih =>\n    rw [Finset.sum_range_succ]\n    push_cast\n    linarith",
+          "imports": "import Mathlib.Tactic",
+          "solver_results": [
+            {
+              "model": "model_b",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_self",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "attempts": 10
+            }
+          ]
+        },
+        {
+          "round": 9,
+          "theorem_statement": "theorem prod_range_add_one (n : \u2115) : \u220f i \u2208 Finset.range n, (i + 1 : \u2115) = n.factorial",
+          "proof": ":= by\n  induction n with\n  | zero => simp\n  | succ n ih =>\n    rw [Finset.prod_range_succ, ih, Nat.factorial_succ, Nat.mul_comm]",
+          "imports": "import Mathlib.Tactic",
+          "solver_results": [
+            {
+              "model": "model_b",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_self",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "attempts": 10
+            }
+          ]
+        },
+        {
+          "round": 10,
+          "theorem_statement": "theorem int_sq_mod8_cases (n : \u2124) : n ^ 2 % 8 = 0 \u2228 n ^ 2 % 8 = 1 \u2228 n ^ 2 % 8 = 4",
+          "proof": ":= by\n  have hn : n % 8 = 0 \u2228 n % 8 = 1 \u2228 n % 8 = 2 \u2228 n % 8 = 3 \u2228 n % 8 = 4 \u2228 \n            n % 8 = 5 \u2228 n % 8 = 6 \u2228 n % 8 = 7 \u2228\n            n % 8 = -1 \u2228 n % 8 = -2 \u2228 n % 8 = -3 \u2228 n % 8 = -4 \u2228\n            n % 8 = -5 \u2228 n % 8 = -6 \u2228 n % 8 = -7 := by omega\n  have key : n ^ 2 % 8 = (n % 8) ^ 2 % 8 := by\n    conv_lhs => rw [show n = 8 * (n / 8) + n % 8 from (Int.ediv_add_emod n 8).symm]\n    ring_nf\n    omega\n  rw [key]\n  rcases hn with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h <;>\n    simp [h]",
+          "imports": "import Mathlib.Tactic",
+          "solver_results": [
+            {
+              "model": "model_b",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_self",
+              "solved": true,
+              "attempts": 10
+            },
+            {
+              "model": "model_a",
+              "solved": true,
+              "attempts": 10
+            }
+          ]
+        }
+      ],
+      "loop_scores": [
+        {
+          "theorem_id": "round_1",
+          "gap_score": 0.3402,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.16666666666666666,
+          "other_solve_rates": {
+            "model_b": 0.16666666666666666,
+            "model_a": 0.16666666666666666
+          }
+        },
+        {
+          "theorem_id": "round_2",
+          "gap_score": 0.3433,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.16666666666666666,
+          "other_solve_rates": {
+            "model_b": 0.16666666666666666,
+            "model_a": 0.16666666666666666
+          }
+        },
+        {
+          "theorem_id": "round_3",
+          "gap_score": 0.4461,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.16666666666666666,
+          "other_solve_rates": {
+            "model_b": 0.16666666666666666,
+            "model_a": 0.08333333333333333
+          }
+        },
+        {
+          "theorem_id": "round_5",
+          "gap_score": 0.3356,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.16666666666666666,
+          "other_solve_rates": {
+            "model_b": 0.16666666666666666,
+            "model_a": 0.16666666666666666
+          }
+        },
+        {
+          "theorem_id": "round_6",
+          "gap_score": 0.3324,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.16666666666666666,
+          "other_solve_rates": {
+            "model_b": 0.16666666666666666,
+            "model_a": 0.16666666666666666
+          }
+        },
+        {
+          "theorem_id": "round_7",
+          "gap_score": 0.3315,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.16666666666666666,
+          "other_solve_rates": {
+            "model_b": 0.16666666666666666,
+            "model_a": 0.16666666666666666
+          }
+        },
+        {
+          "theorem_id": "round_8",
+          "gap_score": 0.3364,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.16666666666666666,
+          "other_solve_rates": {
+            "model_b": 0.16666666666666666,
+            "model_a": 0.16666666666666666
+          }
+        },
+        {
+          "theorem_id": "round_9",
+          "gap_score": 0.3381,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.16666666666666666,
+          "other_solve_rates": {
+            "model_b": 0.16666666666666666,
+            "model_a": 0.16666666666666666
+          }
+        },
+        {
+          "theorem_id": "round_10",
+          "gap_score": 0.3329,
+          "raw_gap": 0.0,
+          "self_solve_rate": 0.16666666666666666,
+          "other_solve_rates": {
+            "model_b": 0.16666666666666666,
+            "model_a": 0.16666666666666666
+          }
+        }
+      ],
+      "best_submission": "round_3",
+      "final_score": {
+        "theorem_id": "round_3",
+        "gap_score": 0.4998,
+        "raw_gap": 0.0,
+        "self_solve_rate": 0.96875,
+        "other_solve_rates": {
+          "model_b": 0.96875,
+          "model_a": 0.1875
+        }
+      }
+    }
+  ],
+  "best_generator": {
+    "model": "claude-sonnet-4-6",
+    "gap_score": 0.4998,
+    "theorem_id": "round_3"
+  }
+}

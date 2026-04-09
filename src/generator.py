@@ -1,17 +1,16 @@
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-
-from anthropic.types import ToolParam
+from typing import Any
 
 from .config import EvalConfig
 from .lean import LeanCompiler
-from .models import LLMClient
+from .models import LLMClient, ToolDef, ToolResult
 from .prompts import GENERATOR_SYSTEM
 
 log = logging.getLogger(__name__)
 
-PROPOSE_THEOREM_TOOL: ToolParam = {
+PROPOSE_THEOREM_TOOL: ToolDef = {
     "name": "propose_theorem",
     "description": (
         "Propose a theorem with its proof. The harness compiles it. "
@@ -76,7 +75,7 @@ async def run_generator(
 ) -> list[RoundResult]:
     """Run the generator for `config.rounds` rounds, returning results per round."""
     tools = [PROPOSE_THEOREM_TOOL]
-    messages = [{
+    messages: list[Any] = [{
         "role": "user",
         "content": (
             f"Design and submit {config.rounds} theorem(s), one per round. "
@@ -100,11 +99,9 @@ async def run_generator(
             max_tokens=config.generator_model.max_tokens,
         )
 
-        messages.append({"role": "assistant", "content": response.content})
+        messages.extend(llm.format_assistant(response))
 
-        tool_uses = [b for b in response.content if b.type == "tool_use"]
-
-        if not tool_uses:
+        if not response.tool_calls:
             if current_round >= config.rounds:
                 break
             messages.append({
@@ -113,21 +110,20 @@ async def run_generator(
             })
             continue
 
-        tool_results = []
-        for block in tool_uses:
-            if block.name != "propose_theorem":
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": "Unknown tool. Use propose_theorem.",
-                    "is_error": True,
-                })
+        tool_results: list[ToolResult] = []
+        for tc in response.tool_calls:
+            if tc.name != "propose_theorem":
+                tool_results.append(ToolResult(
+                    tool_call_id=tc.id,
+                    content="Unknown tool. Use propose_theorem.",
+                    is_error=True,
+                ))
                 continue
 
             calls_this_round += 1
-            theorem_statement = block.input.get("theorem_statement", "")
-            proof = block.input.get("proof", "")
-            imports = block.input.get("imports", "import Mathlib")
+            theorem_statement = tc.input.get("theorem_statement", "")
+            proof = tc.input.get("proof", "")
+            imports = tc.input.get("imports", "import Mathlib")
 
             full_code = LeanCompiler.assemble(imports, theorem_statement, proof)
             result = await lean.check(full_code)
@@ -139,31 +135,36 @@ async def run_generator(
                     error_msg = "Proof contains sorry — not accepted.\n" + error_msg
 
                 if calls_this_round >= config.generator_max_calls:
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": (
-                            f"Compilation FAILED. Call budget exhausted for this round.\n"
-                            f"{error_msg}"
+                    skipped_round = current_round + 1
+                    remaining_rounds = config.rounds - skipped_round
+                    tool_results.append(ToolResult(
+                        tool_call_id=tc.id,
+                        content=(
+                            f"Compilation FAILED. Call budget exhausted — Round {skipped_round} "
+                            f"is SKIPPED (no theorem submitted, scores zero).\n"
+                            f"{error_msg}\n\n"
+                            f"You have {remaining_rounds} round(s) remaining. "
+                            f"Simplify your approach — target a theorem you can prove "
+                            f"in fewer attempts. A submitted theorem that everyone solves "
+                            f"is better than no submission at all."
                         ),
-                    })
+                    ))
                     log.warning(
                         "Generator exhausted call budget for round %d without a valid proof "
                         "(%d calls used, no theorem submitted)",
-                        current_round + 1,
+                        skipped_round,
                         calls_this_round,
                     )
                     current_round += 1
                     calls_this_round = 0
                 else:
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": (
+                    tool_results.append(ToolResult(
+                        tool_call_id=tc.id,
+                        content=(
                             f"Compilation FAILED ({remaining} calls remaining this round):\n"
                             f"{error_msg}"
                         ),
-                    })
+                    ))
                 continue
 
             # Proof compiled — submit to solvers
@@ -220,13 +221,50 @@ async def run_generator(
                     f"\nProceed to Round {current_round + 1}."
                 )
 
-            tool_results.append({
-                "type": "tool_result",
-                "tool_use_id": block.id,
-                "content": "\n".join(result_lines),
-            })
+            tool_results.append(ToolResult(
+                tool_call_id=tc.id,
+                content="\n".join(result_lines),
+            ))
             calls_this_round = 0
 
-        messages.append({"role": "user", "content": tool_results})
+        messages.extend(llm.format_tool_results(tool_results))
+
+        # After a successful submission, optionally compact the conversation
+        # by asking the generator to summarize what it's learned so far.
+        if (config.summarize_rounds
+                and round_results
+                and round_results[-1].round_number == current_round
+                and current_round < config.rounds):
+            summary = await _request_summary(config, llm, messages)
+            messages = [
+                messages[0],
+                {"role": "user", "content": summary},
+            ]
 
     return round_results
+
+
+_SUMMARY_PROMPT = (
+    "Before continuing, write a brief summary of your work so far: "
+    "what theorems you tried, what compilation errors you hit, what "
+    "the solver results were, and what strategies you want to try next. "
+    "This summary will replace the conversation history to save context, "
+    "so include everything you need to remember."
+)
+
+
+async def _request_summary(
+    config: EvalConfig,
+    llm: LLMClient,
+    messages: list[Any],
+) -> str:
+    """Ask the generator to summarize its work so far."""
+    summary_messages = [*messages, {"role": "user", "content": _SUMMARY_PROMPT}]
+    response = await llm.send(
+        model=config.generator_model.model_id,
+        system=GENERATOR_SYSTEM,
+        messages=summary_messages,
+        tools=[],
+        max_tokens=config.generator_model.max_tokens,
+    )
+    return response.text or "No summary provided."

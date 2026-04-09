@@ -1,0 +1,59 @@
+{
+  "timestamp": "2026-04-09T21:09:46.658259+00:00",
+  "config": {
+    "generator": "claude-haiku-4-5-20251001",
+    "solvers": [
+      "claude-haiku-4-5-20251001",
+      "claude-sonnet-4-6"
+    ],
+    "rounds": 1,
+    "solver_max_calls": 10,
+    "attempts_during_loop": 1,
+    "attempts_reeval": 3
+  },
+  "anonymization": {
+    "model_self": "claude-haiku-4-5-20251001",
+    "model_a": "claude-sonnet-4-6"
+  },
+  "rounds": [
+    {
+      "round": 1,
+      "theorem_statement": "theorem injective_comp_of_injective_left {\u03b1 \u03b2 \u03b3 : Type*} {f : \u03b1 \u2192 \u03b2} {g : \u03b2 \u2192 \u03b3} \n    (hf : Function.Injective f) (hg : Function.Injective g) : \n    Function.Injective (g \u2218 f)",
+      "proof": ":= by\n  intro x\u2081 x\u2082 h\n  have : g (f x\u2081) = g (f x\u2082) := h\n  have : f x\u2081 = f x\u2082 := hg this\n  exact hf this",
+      "imports": "import Mathlib",
+      "solver_results": [
+        {
+          "model": "model_self",
+          "solved": true,
+          "attempts": 1
+        },
+        {
+          "model": "model_a",
+          "solved": true,
+          "attempts": 1
+        }
+      ]
+    }
+  ],
+  "loop_scores": [
+    {
+      "theorem_id": "round_1",
+      "gap_score": 0.5057,
+      "raw_gap": 0.0,
+      "self_solve_rate": 0.6666666666666666,
+      "other_solve_rates": {
+        "model_a": 0.6666666666666666
+      }
+    }
+  ],
+  "best_submission": "round_1",
+  "final_score": {
+    "theorem_id": "round_1",
+    "gap_score": 0.5031,
+    "raw_gap": 0.0,
+    "self_solve_rate": 0.8,
+    "other_solve_rates": {
+      "model_a": 0.8
+    }
+  }
+}

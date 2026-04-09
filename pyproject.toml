@@ -1,0 +1,11 @@
+[project]
+name = "proofbench"
+version = "0.1.0"
+description = "AI eval: generator crafts Lean 4 theorems that a fresh copy can solve but others can't"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "anthropic>=0.52.0",
+    "numpy>=1.26.0",
+    "python-dotenv>=1.1.0",
+]

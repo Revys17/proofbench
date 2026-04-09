@@ -1,0 +1,59 @@
+{
+  "timestamp": "2026-04-09T21:16:30.655695+00:00",
+  "config": {
+    "generator": "claude-haiku-4-5-20251001",
+    "solvers": [
+      "claude-haiku-4-5-20251001",
+      "claude-sonnet-4-6"
+    ],
+    "rounds": 1,
+    "solver_max_calls": 10,
+    "attempts_during_loop": 1,
+    "attempts_reeval": 3
+  },
+  "anonymization": {
+    "model_self": "claude-haiku-4-5-20251001",
+    "model_a": "claude-sonnet-4-6"
+  },
+  "rounds": [
+    {
+      "round": 1,
+      "theorem_statement": "theorem finite_subset_cardinality_strict {\u03b1 : Type*} [DecidableEq \u03b1] {s t : Finset \u03b1} (h : s \u2282 t) : s.card < t.card",
+      "proof": ":= Finset.card_lt_card h",
+      "imports": "import Mathlib.Data.Finset.Card",
+      "solver_results": [
+        {
+          "model": "model_self",
+          "solved": true,
+          "attempts": 1
+        },
+        {
+          "model": "model_a",
+          "solved": true,
+          "attempts": 1
+        }
+      ]
+    }
+  ],
+  "loop_scores": [
+    {
+      "theorem_id": "round_1",
+      "gap_score": 0.4969,
+      "raw_gap": 0.0,
+      "self_solve_rate": 0.6666666666666666,
+      "other_solve_rates": {
+        "model_a": 0.6666666666666666
+      }
+    }
+  ],
+  "best_submission": "round_1",
+  "final_score": {
+    "theorem_id": "round_1",
+    "gap_score": 0.502,
+    "raw_gap": 0.0,
+    "self_solve_rate": 0.8,
+    "other_solve_rates": {
+      "model_a": 0.8
+    }
+  }
+}

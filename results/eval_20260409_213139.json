@@ -1,0 +1,134 @@
+{
+  "timestamp": "2026-04-09T21:31:39.002637+00:00",
+  "config": {
+    "generator": "claude-opus-4-6",
+    "solvers": [
+      "claude-opus-4-6",
+      "claude-sonnet-4-6",
+      "claude-haiku-4-5-20251001"
+    ],
+    "rounds": 3,
+    "solver_max_calls": 10,
+    "attempts_during_loop": 1,
+    "attempts_reeval": 3
+  },
+  "anonymization": {
+    "model_self": "claude-opus-4-6",
+    "model_a": "claude-sonnet-4-6",
+    "model_b": "claude-haiku-4-5-20251001"
+  },
+  "rounds": [
+    {
+      "round": 1,
+      "theorem_statement": "theorem pow_add_pow_mod (n : \u2115) : (3^(2*n+1) + 2^(2*n+1)) % 5 = 0",
+      "proof": ":= by\n  induction n with\n  | zero => norm_num\n  | succ k ih =>\n    have h3 : 3^(2*(k+1)+1) = 3^(2*k+1) * 9 := by ring_nf\n    have h2 : 2^(2*(k+1)+1) = 2^(2*k+1) * 4 := by ring_nf\n    rw [h3, h2]\n    have : (3 ^ (2 * k + 1) * 9 + 2 ^ (2 * k + 1) * 4) = \n           4 * (3 ^ (2 * k + 1) + 2 ^ (2 * k + 1)) + 5 * 3 ^ (2 * k + 1) := by ring\n    rw [this]\n    omega",
+      "imports": "import Mathlib",
+      "solver_results": [
+        {
+          "model": "model_self",
+          "solved": true,
+          "attempts": 1
+        },
+        {
+          "model": "model_a",
+          "solved": true,
+          "attempts": 1
+        },
+        {
+          "model": "model_b",
+          "solved": false,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "round": 2,
+      "theorem_statement": "theorem pow_minus_linear_div (n : \u2115) : 16 \u2223 5^n - 4*n - 1",
+      "proof": ":= by\n  suffices h : \u2203 m, 5^n = 16 * m + 4 * n + 1 by\n    obtain \u27e8m, hm\u27e9 := h\n    use m\n    omega\n  induction n with\n  | zero => exact \u27e80, by norm_num\u27e9\n  | succ k ih =>\n    obtain \u27e8m, hm\u27e9 := ih\n    use 5 * m + k\n    calc 5 ^ (k + 1) = 5 * 5^k := by ring\n      _ = 5 * (16 * m + 4 * k + 1) := by rw [hm]\n      _ = 16 * (5 * m + k) + 4 * (k + 1) + 1 := by ring",
+      "imports": "import Mathlib",
+      "solver_results": [
+        {
+          "model": "model_self",
+          "solved": true,
+          "attempts": 1
+        },
+        {
+          "model": "model_a",
+          "solved": false,
+          "attempts": 1
+        },
+        {
+          "model": "model_b",
+          "solved": false,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "round": 3,
+      "theorem_statement": "theorem pow_mod_identity (n : \u2115) : 64 \u2223 3^(2*n+2) - 8*n - 9",
+      "proof": ":= by\n  suffices h : \u2203 m, 3^(2*n+2) = 64 * m + 8 * n + 9 by\n    obtain \u27e8m, hm\u27e9 := h\n    use m; omega\n  induction n with\n  | zero => exact \u27e80, by norm_num\u27e9\n  | succ k ih =>\n    obtain \u27e8m, hm\u27e9 := ih\n    -- 3^(2*(k+1)+2) = 3^(2*k+4) = 9 * 3^(2*k+2) = 9*(64m + 8k + 9) = 576m + 72k + 81\n    -- = 64*(9*m + k + 1) + (576m - 64*(9m) + 72k - 64*k - 64 + 81 - 64 + 64)\n    -- Actually: 576m + 72k + 81 = 64*(9m + k + 1) + (576m - 576m) + (72k - 64k - 64) + (81 - 8 - 9 + ?)\n    -- 576m + 72k + 81 = 64*9m + 64*k + 64 + 8k + 8 + 9\n    -- = 64*(9m + k + 1) + 8*(k+1) + 9\n    use 9 * m + k + 1\n    have h3 : 3^(2*(k+1)+2) = 9 * 3^(2*k+2) := by ring\n    rw [h3, hm]\n    ring",
+      "imports": "import Mathlib",
+      "solver_results": [
+        {
+          "model": "model_self",
+          "solved": true,
+          "attempts": 1
+        },
+        {
+          "model": "model_a",
+          "solved": false,
+          "attempts": 1
+        },
+        {
+          "model": "model_b",
+          "solved": false,
+          "attempts": 1
+        }
+      ]
+    }
+  ],
+  "loop_scores": [
+    {
+      "theorem_id": "round_1",
+      "gap_score": 0.4635,
+      "raw_gap": 0.0,
+      "self_solve_rate": 0.6666666666666666,
+      "other_solve_rates": {
+        "model_a": 0.6666666666666666,
+        "model_b": 0.3333333333333333
+      }
+    },
+    {
+      "theorem_id": "round_2",
+      "gap_score": 0.7375,
+      "raw_gap": 0.3333333333333333,
+      "self_solve_rate": 0.6666666666666666,
+      "other_solve_rates": {
+        "model_a": 0.3333333333333333,
+        "model_b": 0.3333333333333333
+      }
+    },
+    {
+      "theorem_id": "round_3",
+      "gap_score": 0.7304,
+      "raw_gap": 0.3333333333333333,
+      "self_solve_rate": 0.6666666666666666,
+      "other_solve_rates": {
+        "model_a": 0.3333333333333333,
+        "model_b": 0.3333333333333333
+      }
+    }
+  ],
+  "best_submission": "round_2",
+  "final_score": {
+    "theorem_id": "round_2",
+    "gap_score": 0.9192,
+    "raw_gap": 0.4,
+    "self_solve_rate": 0.8,
+    "other_solve_rates": {
+      "model_a": 0.4,
+      "model_b": 0.2
+    }
+  }
+}
